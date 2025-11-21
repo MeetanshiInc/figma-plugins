@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Emoji & Sticker Library</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; background-color: #f5f5f5; }
+    .container { padding: 16px; }
+    
+    .sticky-header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background-color: #f5f5f5;
+    }
+
+    .tabs { display: flex; border-bottom: 1px solid #e0e0e0; background-color: white; padding: 12px 16px 0 16px; }
+    .tab-button { padding: 8px 16px; border: none; background-color: transparent; cursor: pointer; font-size: 14px; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+    .tab-button.active { border-bottom: 2px solid #0d99ff; font-weight: 600; color: #0d99ff; }
+    .search-container { padding: 12px 16px; background-color: white; border-bottom: 1px solid #ddd; }
+    #search-input { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; box-sizing: border-box; }
+    .controls-container { padding: 10px 16px; background: #f0f0f0; border-bottom: 1px solid #ddd; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .control-group { display: flex; align-items: center; gap: 5px; }
+    .control-group label { font-size: 12px; }
+    .control-group input { width: 50px; padding: 4px; border: 1px solid #ccc; border-radius: 4px; }
+    #bomb-button { padding: 6px 10px; border: none; background-color: #8A2BE2; color: white; border-radius: 4px; cursor: pointer; font-weight: bold; }
+    #item-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 10px; }
+    .item-card { position: relative; border-radius: 8px; padding: 8px; cursor: pointer; background-color: #ffffff; display: flex; align-items: center; justify-content: center; height: 80px; }
+    .item-card img { max-width: 100%; max-height: 100%; pointer-events: none; }
+    .fav-button { position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.3); color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; opacity: 0.5; font-size: 12px; line-height: 24px; text-align: center; }
+    .item-card:hover .fav-button { opacity: 1; }
+    .fav-button.favorited { background: #ff4d4d; opacity: 1; }
+    .section-title { font-weight: bold; margin-top: 20px; margin-bottom: 10px; color: #555; grid-column: 1 / -1; }
+  </style>
+</head>
+<body>
+
+  <div class="sticky-header">
+    <div class="tabs">
+      <button id="emojis-tab" class="tab-button active">Emojis</button>
+      <button id="stickers-tab" class="tab-button">Stickers</button>
+      <button id="favorites-tab" class="tab-button">❤️ Library</button>
+    </div>
+
+    <div class="search-container">
+      <input type="search" id="search-input" placeholder="Search for anything...">
+    </div>
+
+    <div class="controls-container">
+      <div class="control-group"><label for="size-input">Size:</label><input type="number" id="size-input" value="100"></div>
+      <div class="control-group"><label for="rotation-input">Rotation:</label><input type="number" id="rotation-input" value="0"></div>
+      <div class="control-group"><label for="bomb-qty-input">Qty:</label><input type="number" id="bomb-qty-input" value="15"></div>
+      <button id="bomb-button">💥 Sticker Bomb</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div id="grid-view">
+      <div id="item-grid"><p>🔄 Loading...</p></div>
+    </div>
+  </div>
+
+  <script>
+    const GIPHY_API_KEY = 'Nwg0cGhOZaovgTWxTrst7dDUNaKqyZE7';
+    const library = { emojis: [], stickers: [], favorites: [], recents: [] };
+    const itemGrid = document.getElementById('item-grid');
+    const searchInput = document.getElementById('search-input');
+    const sizeInput = document.getElementById('size-input');
+    const rotationInput = document.getElementById('rotation-input');
+    const bombQtyInput = document.getElementById('bomb-qty-input');
+    const bombButton = document.getElementById('bomb-button');
+    const tabs = {
+      emojis: document.getElementById('emojis-tab'),
+      stickers: document.getElementById('stickers-tab'),
+      favorites: document.getElementById('favorites-tab'),
+    };
+    let activeCategory = 'emojis';
+    let currentSelection = null;
+    let searchTimeout;
+
+    function renderItems(items, category) {
+      itemGrid.innerHTML = '';
+      if (category === 'favorites') {
+        if (library.favorites.length > 0) {
+            const favTitle = document.createElement('div');
+            favTitle.className = 'section-title';
+            favTitle.textContent = 'Favorites';
+            itemGrid.appendChild(favTitle);
+            library.favorites.forEach(item => createCard(item));
+        }
+        if (library.recents.length > 0) {
+            const recentsTitle = document.createElement('div');
+            recentsTitle.className = 'section-title';
+            recentsTitle.textContent = 'Recently Used';
+            itemGrid.appendChild(recentsTitle);
+            library.recents.forEach(item => createCard(item));
+        }
+        if (library.favorites.length === 0 && library.recents.length === 0) {
+            itemGrid.innerHTML = '<p>Your favorite and recent items will appear here.</p>';
+        }
+      } else {
+        if (!items || items.length === 0) {
+            itemGrid.innerHTML = '<p>No results found.</p>';
+            return;
+        }
+        items.forEach(item => createCard(item));
+      }
+    }
+
+    function createCard(item) {
+        const isFavorited = library.favorites.some(fav => fav.animatedImageUrl === item.animatedImageUrl);
+        const card = document.createElement('div');
+        card.className = 'item-card';
+        card.innerHTML = `<img src="${item.staticImageUrl}" alt="${item.name}" title="${item.name}"><button class="fav-button ${isFavorited ? 'favorited' : ''}">❤️</button>`;
+        card.onclick = (e) => {
+            if (e.target.classList.contains('fav-button')) return;
+            currentSelection = item;
+            insertItem(item);
+        };
+        card.querySelector('.fav-button').onclick = () => toggleFavorite(item);
+        itemGrid.appendChild(card);
+    }
+
+    function insertItem(item) {
+        addToRecents(item);
+        parent.postMessage({ pluginMessage: { 
+            type: 'insert-item', 
+            payload: { item, size: parseInt(sizeInput.value) || 100, rotation: parseInt(rotationInput.value) || 0 }
+        }}, '*');
+    }
+
+    function toggleFavorite(item) {
+        const index = library.favorites.findIndex(fav => fav.animatedImageUrl === item.animatedImageUrl);
+        if (index > -1) { library.favorites.splice(index, 1); } 
+        else { library.favorites.unshift(item); }
+        saveStorage();
+        setActiveTab(activeCategory, true);
+    }
+
+    function addToRecents(item) {
+        const index = library.recents.findIndex(rec => rec.animatedImageUrl === item.animatedImageUrl);
+        if (index > -1) library.recents.splice(index, 1);
+        library.recents.unshift(item);
+        if (library.recents.length > 20) library.recents.pop();
+        saveStorage();
+    }
+
+    function saveStorage() {
+        parent.postMessage({ pluginMessage: {
+            type: 'set-storage',
+            payload: { favorites: library.favorites, recents: library.recents }
+        }}, '*');
+    }
+
+    function setActiveTab(category, forceRender = false) {
+        activeCategory = category;
+        Object.values(tabs).forEach(tab => tab.classList.remove('active'));
+        tabs[category].classList.add('active');
+        if (!forceRender) searchInput.value = '';
+        
+        switch (category) {
+            case 'emojis': loadEmojis(); break;
+            case 'stickers': loadStickers(searchInput.value); break;
+            case 'favorites': renderItems(null, 'favorites'); break;
+        }
+    }
+
+    bombButton.onclick = () => {
+        if (!currentSelection) { alert('Please select an emoji or sticker first!'); return; }
+        parent.postMessage({ pluginMessage: {
+            type: 'sticker-bomb',
+            payload: { item: currentSelection, size: parseInt(sizeInput.value) || 100, rotation: parseInt(rotationInput.value) || 0, quantity: parseInt(bombQtyInput.value) || 15 }
+        }}, '*');
+    };
+
+    function performSearch() {
+        const query = searchInput.value.trim().toLowerCase();
+        if (activeCategory === 'emojis') {
+            const results = library.emojis.filter(item => item.name.replace(/_/g, ' ').includes(query));
+            renderItems(results, 'emojis');
+        } else if (activeCategory === 'stickers') {
+            loadStickers(query);
+        }
+    }
+    
+    function loadEmojis() {
+        if (library.emojis.length > 0) { performSearch(); return; }
+        itemGrid.innerHTML = `<p>🔄 Loading emojis...</p>`;
+        parent.postMessage({ pluginMessage: { type: 'load-emojis' } }, '*');
+    }
+    
+    async function loadStickers(query = '') {
+        if (GIPHY_API_KEY === 'YOUR_API_KEY_HERE') { itemGrid.innerHTML = `<p>⚠️ Please add your Giphy API Key.</p>`; return; }
+        itemGrid.innerHTML = `<p>🔄 Loading stickers...</p>`;
+        let url = `https://api.giphy.com/v1/stickers/trending?api_key=${GIPHY_API_KEY}&limit=100`;
+        if (query) { url = `https://api.giphy.com/v1/stickers/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(query)}&limit=100`; }
+        try {
+            const response = await fetch(url);
+            const result = await response.json();
+            const stickers = result.data.map(item => {
+                const previewUrl = item.images.preview_gif?.url || item.images.fixed_width_still?.url || item.images.fixed_height_still?.url;
+                return { name: item.title, staticImageUrl: previewUrl, animatedImageUrl: item.images.original.url };
+            }).filter(item => item.staticImageUrl);
+            renderItems(stickers, 'stickers');
+        } catch (error) { itemGrid.innerHTML = `<p>❌ Could not load stickers.</p>`; }
+    }
+
+    Object.values(tabs).forEach(tab => tab.onclick = () => setActiveTab(tab.id.replace('-tab', '')));
+    searchInput.addEventListener('input', () => { clearTimeout(searchTimeout); searchTimeout = setTimeout(performSearch, 300); });
+    
+    window.onload = () => {
+        parent.postMessage({ pluginMessage: { type: 'get-storage' } }, '*');
+        setActiveTab('emojis');
+    };
+
+    window.onmessage = (event) => {
+        const msg = event.data.pluginMessage;
+        switch (msg.type) {
+            case 'storage-result':
+                library.favorites = msg.payload.favorites || [];
+                library.recents = msg.payload.recents || [];
+                if (activeCategory === 'favorites') renderItems(null, 'favorites');
+                break;
+            case 'emojis-loaded':
+                library.emojis = msg.payload;
+                performSearch();
+                break;
+            case 'emojis-failed':
+                itemGrid.innerHTML = `<p>❌ Could not load emojis.</p>`;
+                break;
+        }
+    };
+  </script>
+</body>
+</html>

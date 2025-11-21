@@ -1,0 +1,14 @@
+{
+  "name": "BG Remover (Final)",
+  "id": "1558375613964209335",
+  "api": "1.0.0",
+  "main": "dist/code.js",
+  "ui": "dist/ui.html",
+  "documentAccess": "dynamic-page",
+  "editorType": ["figma"],
+  "networkAccess": {
+    "allowedDomains": [
+      "https://*.remove.bg"
+    ]
+  }
+}

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 35.83 37.73">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: #212121;
+      }
+
+      .cls-2 {
+        fill: #f3703a;
+      }
+    </style>
+  </defs>
+  <polygon class="cls-2" points="17.92 22.13 14.48 29.47 21.39 29.47 17.92 22.13"/>
+  <path class="cls-1" d="M17.92,0L0,37.73h35.83L17.92,0ZM17.91,16.92l6.9,14.52h-13.8l6.9-14.52Z"/>
+</svg>

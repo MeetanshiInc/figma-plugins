@@ -1,0 +1,27 @@
+{
+  "name": "Image Converter (Pro+)",
+  "id": "1568117283947881219",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "editorType": ["figma"],
+  "documentAccess": "dynamic-page",
+  "networkAccess": {
+    "allowedDomains": [
+      "https://cdn.jsdelivr.net"
+    ]
+  },
+
+  "menu": [
+    { "name": "Open Image Converter", "command": "open" },
+    { "separator": true },
+    { "name": "About Plugin", "command": "about" }
+  ],
+
+  "relaunchButtons": [
+    {
+      "command": "open",
+      "name": "Open Converter"
+    }
+  ]
+}

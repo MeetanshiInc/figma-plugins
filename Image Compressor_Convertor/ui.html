@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <script src="https://cdn.jsdelivr.net/npm/heic2any/dist/heic2any.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      font-family: "Inter", sans-serif;
+      background: #f9fafb;
+      color: #222;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .top-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    h3 { margin: 0; font-size: 18px; font-weight: 600; }
+    .coffee-btn {
+      background: #6f4e37;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-weight: 600;
+      font-size: 14px;
+      text-decoration: none;
+      transition: background 0.2s ease, transform 0.1s ease;
+    }
+    .coffee-btn:hover { background: #5c3f2d; transform: translateY(-1px); }
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+      padding: 18px 20px 20px;
+      width: 360px;
+      text-align: center;
+    }
+    select, button, input[type="range"] {
+      width: 100%;
+      margin-top: 10px;
+      padding: 9px 12px;
+      font-size: 14px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+    }
+    button {
+      background: #007aff;
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-weight: 500;
+      margin-top: 12px;
+      transition: background 0.2s ease;
+    }
+    button:hover { background: #005fcc; }
+    #dropZone {
+      margin-top: 14px;
+      padding: 22px;
+      border: 2px dashed #aaa;
+      border-radius: 10px;
+      color: #555;
+      font-size: 13px;
+      background: #fafafa;
+      cursor: pointer;
+      transition: all 0.25s ease;
+    }
+    #dropZone.dragover {
+      border-color: #007aff;
+      color: #007aff;
+      background: #f0f7ff;
+    }
+    small { color: #777; display: block; margin-top: 4px; }
+    #result {
+      margin-top: 10px;
+      text-align: left;
+      font-size: 13px;
+      max-height: 80px;
+      overflow-y: auto;
+    }
+    footer { text-align: center; font-size: 12px; color: #888; margin-bottom: 6px; }
+  </style>
+</head>
+<body>
+  <div class="top-section">
+    <a class="coffee-btn" href="https://razorpay.me/@meetanshi" target="_blank">☕ Buy Me a Coffee</a>
+    <h3>🖼️ Image Converter <span style="font-weight:400;">(Pro+)</span></h3>
+  </div>
+
+  <div class="card">
+    <p>Convert Figma layers or upload images below:</p>
+    <select id="format">
+      <option value="PNG">PNG</option>
+      <option value="JPG">JPG</option>
+      <option value="WEBP">WEBP</option>
+      <option value="TIFF">TIFF</option>
+    </select>
+    <div style="font-size:13px;text-align:left;margin-top:12px;">Quality: <span id="qv">0.9</span></div>
+    <input type="range" id="quality" min="0.1" max="1" step="0.1" value="0.9" />
+    <button id="convert">Convert Selected Layers</button>
+    <div id="dropZone">
+      📁 Drag & drop images here (HEIC, PNG, JPG, WEBP, TIFF)
+      <small>(or double-click to browse)</small>
+    </div>
+    <input type="file" id="fileInput" accept=".heic,.jpg,.jpeg,.png,.webp,.tiff" multiple hidden />
+    <div id="result"></div>
+  </div>
+
+  <footer>⚡ Works 100% offline inside Figma</footer>
+
+  <script>
+    const dropZone = document.getElementById("dropZone");
+    const fileInput = document.getElementById("fileInput");
+    const result = document.getElementById("result");
+    const qSlider = document.getElementById("quality");
+    const qValue = document.getElementById("qv");
+    qSlider.oninput = () => (qValue.textContent = qSlider.value);
+
+    document.getElementById("convert").onclick = () => {
+      const format = document.getElementById("format").value;
+      const quality = parseFloat(qSlider.value);
+      result.innerHTML = "⏳ Exporting and converting Figma layers...";
+      parent.postMessage({ pluginMessage: { type: "export-images", format, quality } }, "*");
+    };
+
+    async function handleFiles(files) {
+      const format = document.getElementById("format").value;
+      const quality = parseFloat(qSlider.value);
+      result.innerHTML = "⏳ Converting files...";
+
+      for (const file of files) {
+        try {
+          let outputBlob;
+          const ext = file.name.split(".").pop().toLowerCase();
+          if (ext === "heic" || file.type === "image/heic") {
+            outputBlob = await heic2any({ blob: file, toType: "image/png", quality });
+          } else {
+            const img = await createImageBitmap(file);
+            const canvas = document.createElement("canvas");
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0);
+            outputBlob = await new Promise((res) =>
+              canvas.toBlob(res, `image/${format.toLowerCase()}`, quality)
+            );
+          }
+
+          // Get actual dimensions
+          const imgForSize = new Image();
+          const blobURL = URL.createObjectURL(outputBlob);
+          await new Promise((resolve) => {
+            imgForSize.onload = resolve;
+            imgForSize.src = blobURL;
+          });
+          const width = imgForSize.width, height = imgForSize.height;
+          URL.revokeObjectURL(blobURL);
+
+          // Send to Figma
+          const reader = new FileReader();
+          reader.onload = () => {
+            const base64Data = reader.result.split(",")[1];
+            parent.postMessage({
+              pluginMessage: { type: "insert-image", base64: base64Data, name: file.name, width, height }
+            }, "*");
+          };
+          reader.readAsDataURL(outputBlob);
+
+          // Optional download
+          const url = URL.createObjectURL(outputBlob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = file.name.replace(/\.\w+$/, `.${format.toLowerCase()}`);
+          a.textContent = `⬇ ${a.download}`;
+          result.appendChild(a);
+        } catch (err) {
+          const p = document.createElement("p");
+          p.textContent = `❌ Error converting ${file.name}`;
+          result.appendChild(p);
+        }
+      }
+    }
+
+    // 🧩 Handle Figma-exported layers
+    window.onmessage = async (event) => {
+      const msg = event.data.pluginMessage;
+      if (!msg) return;
+      if (msg.type === "convert-local") {
+        const { images, format, quality } = msg;
+        result.innerHTML = "⏳ Converting exported layers...";
+        for (const item of images) {
+          const binary = atob(item.base64);
+          const array = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) array[i] = binary.charCodeAt(i);
+          const blob = new Blob([array], { type: "image/png" });
+          const img = await createImageBitmap(blob);
+          const canvas = document.createElement("canvas");
+          canvas.width = img.width; canvas.height = img.height;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0);
+          const outputBlob = await new Promise((res) =>
+            canvas.toBlob(res, `image/${format.toLowerCase()}`, quality)
+          );
+          const width = img.width, height = img.height;
+          const reader = new FileReader();
+          reader.onload = () => {
+            const base64Data = reader.result.split(",")[1];
+            parent.postMessage({
+              pluginMessage: { type: "insert-image", base64: base64Data, name: item.name, width, height }
+            }, "*");
+          };
+          reader.readAsDataURL(outputBlob);
+        }
+        result.innerHTML += "<br>✅ Exported layers converted & inserted!";
+      }
+    };
+
+    // Drag & drop + double click
+    dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.classList.add("dragover"); });
+    dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
+    dropZone.addEventListener("drop", e => {
+      e.preventDefault(); dropZone.classList.remove("dragover");
+      const files = Array.from(e.dataTransfer.files);
+      if (files.length) handleFiles(files);
+    });
+    dropZone.addEventListener("dblclick", () => fileInput.click());
+    fileInput.addEventListener("change", e => {
+      const files = Array.from(e.target.files);
+      if (files.length) handleFiles(files);
+    });
+  </script>
+</body>
+</html>

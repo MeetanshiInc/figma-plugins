@@ -1,0 +1,17 @@
+{
+  "name": "Emoji & Sticker Library",
+  "id": "1554471612703531777",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "editorType": ["figma"],
+  "documentAccess": "dynamic-page",
+  "networkAccess": {
+    "allowedDomains": [
+      "https://*.giphy.com",
+      "https://api.github.com",
+      "https://github.githubassets.com"
+    ],
+    "reasoning": "This plugin fetches stickers and emojis from Giphy and GitHub APIs."
+  }
+}
